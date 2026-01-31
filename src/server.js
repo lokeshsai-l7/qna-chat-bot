@@ -16,30 +16,63 @@ app.use(express.json());
 app.post("/ingest", async (req, res) => {
   const { url, maxPages = 10 } = req.body;
 
-  const pages = await crawlWebsite(url, maxPages);
+  try {
+    const pages = await crawlWebsite(url, maxPages);
+    console.log("CRAWLED PAGES:", pages.length);
 
-  for (const page of pages) {
-    const chunks = chunkText(page.text); // ✅ now defined
+    const CONCURRENCY_LIMIT = 5;
+    const chunksQueue = [];
 
-    for (const chunk of chunks) {
-      const embedding = await embedText(chunk);
-
-      await storeEmbedding({
-        content: chunk,
-        url: page.url,
-        title: page.title,
-        embedding,
-      });
+    for (const page of pages) {
+      const chunks = chunkText(page.text, 300);
+      for (const chunk of chunks) {
+        chunksQueue.push({
+          content: chunk,
+          url: page.url,
+          title: page.title,
+        });
+      }
     }
-  }
 
-  res.json({
-    message: "Website indexed successfully",
-    pagesIndexed: pages.length,
-  });
+    console.log("TOTAL CHUNKS TO PROCESS:", chunksQueue.length);
+
+    async function processChunkQueue(queue, limit) {
+      let index = 0;
+
+      async function worker() {
+        while (index < queue.length) {
+          const currentIndex = index++;
+          const { content, url, title } = queue[currentIndex];
+
+          try {
+            const embedding = await embedText(content);
+            await storeEmbedding({ content, url, title, embedding });
+          } catch (err) {
+            console.error(
+              `❌ Failed to process chunk for ${url}:`,
+              err.message,
+            );
+          }
+        }
+      }
+
+      const workers = Array.from({ length: limit }, () => worker());
+      await Promise.all(workers);
+    }
+
+    await processChunkQueue(chunksQueue, CONCURRENCY_LIMIT);
+
+    res.json({
+      message: "Website indexed successfully",
+      pagesIndexed: pages.length,
+      chunksProcessed: chunksQueue.length,
+    });
+  } catch (err) {
+    console.error("❌ Ingestion failed:", err);
+    res.status(500).json({ error: "Ingestion failed" });
+  }
 });
 
-// Ask Question
 app.post("/ask", async (req, res) => {
   const { question } = req.body;
   const answer = await answerQuestion(question);

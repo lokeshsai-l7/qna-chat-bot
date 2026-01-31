@@ -36,7 +36,6 @@ export async function crawlWebsite(startUrl, maxPages = 10) {
         });
       }
 
-      // extract internal links
       $("a[href]").each((_, el) => {
         const href = $(el).attr("href");
         if (!href) return;
@@ -54,9 +53,7 @@ export async function crawlWebsite(startUrl, maxPages = 10) {
           if (absoluteUrl.startsWith(baseDomain) && !visited.has(absoluteUrl)) {
             queue.push(absoluteUrl);
           }
-        } catch {
-          // ignore invalid URLs
-        }
+        } catch {}
       });
     } catch (err) {
       console.error(`❌ Failed to crawl ${currentUrl}`);

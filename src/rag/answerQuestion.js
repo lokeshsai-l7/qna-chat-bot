@@ -7,10 +7,7 @@ const openai = new OpenAI({
 });
 
 export async function answerQuestion(question) {
-  // Embed the question
   const questionEmbedding = await embedText(question);
-
-  // Retrieve relevant chunks
   const results = await similaritySearch(questionEmbedding, 3);
 
   const context = results.map((r) => r.content).join("\n");

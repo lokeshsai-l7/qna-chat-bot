@@ -1,56 +1,57 @@
 import pkg from "pg";
 const { Pool } = pkg;
 
-/**
- * Single shared connection pool (IMPORTANT)
- */
-export const pool = new Pool({
+const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: {
     rejectUnauthorized: false,
   },
-  max: 10, // max connections
-  idleTimeoutMillis: 30000,
-  connectionTimeoutMillis: 2000,
+  max: 1,
+  idleTimeoutMillis: 0,
+  connectionTimeoutMillis: 10_000,
 });
 
-/**
- * Store document chunk + embedding
- */
-export async function storeEmbedding({
-  content,
-  url = null,
-  title = null,
-  embedding,
-}) {
-  const query = `
-    INSERT INTO documents (content, url, title, embedding)
-    VALUES ($1, $2, $3, $4)
-  `;
+export async function storeEmbedding({ content, url, title, embedding }) {
+  if (!Array.isArray(embedding) || typeof embedding[0] !== "number") {
+    throw new Error("Invalid embedding format. Expected number[]");
+  }
 
-  await pool.query(query, [content, url, title, embedding]);
+  const client = await pool.connect();
+  try {
+    const vectorString = `[${embedding.join(",")}]`;
+    await client.query(
+      `
+      INSERT INTO documents (content, url, title, embedding)
+      VALUES ($1, $2, $3, $4::vector)
+      `,
+      [content, url, title, vectorString],
+    );
+    console.log(`✅ Stored embedding for: ${url}`);
+  } finally {
+    client.release();
+  }
 }
 
-/**
- * Similarity search using pgvector
- */
 export async function similaritySearch(queryEmbedding, limit = 3) {
-  const query = `
-    SELECT content, url, title
-    FROM documents
-    ORDER BY embedding <-> $1
-    LIMIT $2
-  `;
+  if (!Array.isArray(queryEmbedding) || typeof queryEmbedding[0] !== "number") {
+    throw new Error("Invalid query embedding format. Expected number[]");
+  }
 
-  const result = await pool.query(query, [queryEmbedding, limit]);
+  const client = await pool.connect();
+  try {
+    const vectorString = `[${queryEmbedding.join(",")}]`;
+    const { rows } = await client.query(
+      `
+      SELECT content, url, title
+      FROM documents
+      ORDER BY embedding <-> $1::vector
+      LIMIT $2
+      `,
+      [vectorString, limit],
+    );
 
-  return result.rows;
-}
-
-/**
- * Optional: Health check (useful for prod)
- */
-export async function checkDbConnection() {
-  const result = await pool.query("SELECT 1");
-  return result.rowCount === 1;
+    return rows;
+  } finally {
+    client.release();
+  }
 }
