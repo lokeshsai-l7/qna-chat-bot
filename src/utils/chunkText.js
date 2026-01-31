@@ -1,7 +1,9 @@
 export function chunkText(text, chunkSize = 500) {
-  if (!text) return [];
+  if (typeof text !== "string" || text.trim().length === 0) {
+    return [];
+  }
 
-  const words = text.split(" ");
+  const words = text.split(/\s+/);
   const chunks = [];
 
   for (let i = 0; i < words.length; i += chunkSize) {
