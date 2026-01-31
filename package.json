@@ -1,12 +1,13 @@
 {
   "name": "qna-chat-bot",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Q&A support bot that uses Retrieval Augmented Generation.",
+  "main": "src/server.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start" : "node --env-file=.env src/server.js"
   },
-  "keywords": [],
+  "keywords": ["rag", "chat-bot"],
   "author": "Lokesh Sai",
   "license": "ISC",
   "type": "module",
