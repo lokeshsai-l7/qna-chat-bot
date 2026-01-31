@@ -117,7 +117,7 @@ embedding vector(1536) -- dimension matches text-embedding-3-small
 5. **Running the Project**
 
 ```
-node --env-file=.env src/server.js
+npm start
 ```
 
 6. **You should see:**
